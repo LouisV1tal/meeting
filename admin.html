@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Админ-панель · Переговорки</title>
+<link rel="stylesheet" href="assets/style.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+
+<!-- ==================== ВХОД В АДМИНКУ ==================== -->
+<div id="admin-auth" class="shell auth-wrap" hidden>
+  <div class="brand" style="margin-bottom:24px;">
+    <span class="mark">RM</span>
+    <h1>Админ-панель</h1>
+  </div>
+  <div class="panel">
+    <form id="admin-login-form">
+      <div class="field">
+        <label for="admin-pass">Пароль</label>
+        <input id="admin-pass" type="password" required autofocus>
+      </div>
+      <button type="submit" class="btn btn-primary" style="width:100%;">Войти</button>
+      <div class="error-text" id="admin-login-error"></div>
+    </form>
+  </div>
+  <p class="hint" style="text-align:center; margin-top:16px;">
+    <a href="index.html" class="link-btn" style="display:inline;">← Обычный вход для бронирования</a>
+  </p>
+</div>
+
+<!-- ==================== ПАНЕЛЬ ==================== -->
+<div id="admin-app" class="shell" hidden>
+  <div class="topbar">
+    <div class="brand">
+      <span class="mark">RM</span>
+      <h1>Админ-панель</h1>
+    </div>
+    <div class="session">
+      <a href="index.html" class="link-btn">Перейти к бронированию</a>
+      <button class="btn btn-ghost" id="admin-logout">Выйти</button>
+    </div>
+  </div>
+
+  <!-- Комнаты -->
+  <div class="panel">
+    <div class="toolbar">
+      <h2 style="margin:0;">Переговорки</h2>
+      <button class="btn btn-primary" id="add-room-btn">+ Добавить комнату</button>
+    </div>
+    <table id="rooms-table">
+      <thead>
+        <tr><th>Название</th><th>Вместимость</th><th>Оснащение</th><th>Статус</th><th></th></tr>
+      </thead>
+      <tbody id="rooms-tbody"></tbody>
+    </table>
+    <div id="rooms-empty" class="empty" hidden>Комнат пока нет.</div>
+  </div>
+
+  <!-- Пользователи -->
+  <div class="panel">
+    <h2>Пользователи</h2>
+    <table id="users-table">
+      <thead>
+        <tr><th>Имя</th><th>Отдел</th><th>Зарегистрирован</th><th></th></tr>
+      </thead>
+      <tbody id="users-tbody"></tbody>
+    </table>
+    <div id="users-empty" class="empty" hidden>Пользователей пока нет.</div>
+  </div>
+
+  <!-- Брони -->
+  <div class="panel">
+    <div class="toolbar">
+      <h2 style="margin:0;">Брони</h2>
+      <input type="date" id="bookings-date-filter" style="max-width:180px;">
+    </div>
+    <table id="bookings-table">
+      <thead>
+        <tr><th>Комната</th><th>Время</th><th>Кто</th><th>Отдел</th><th>Цель</th><th></th></tr>
+      </thead>
+      <tbody id="bookings-tbody"></tbody>
+    </table>
+    <div id="bookings-empty" class="empty" hidden>На эту дату броней нет.</div>
+  </div>
+</div>
+
+<!-- ==================== МОДАЛКА КОМНАТЫ ==================== -->
+<div class="overlay" id="room-overlay" hidden>
+  <div class="modal">
+    <h3 id="room-modal-title">Новая переговорка</h3>
+    <form id="room-form">
+      <input type="hidden" id="room-id">
+      <div class="field">
+        <label for="room-name">Название</label>
+        <input type="text" id="room-name" required>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label for="room-capacity">Вместимость (чел.)</label>
+          <input type="number" id="room-capacity" min="1">
+        </div>
+      </div>
+      <div class="field">
+        <label for="room-equipment">Оснащение</label>
+        <input type="text" id="room-equipment" placeholder="Проектор, доска, видеосвязь">
+      </div>
+      <div class="field">
+        <label style="display:flex; align-items:center; gap:8px;">
+          <input type="checkbox" id="room-active" style="width:auto;" checked>
+          <span>Комната активна (видна при бронировании)</span>
+        </label>
+      </div>
+      <div class="error-text" id="room-error"></div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" id="room-cancel">Отмена</button>
+        <button type="submit" class="btn btn-primary">Сохранить</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ==================== МОДАЛКА ПЕРЕИМЕНОВАНИЯ ПОЛЬЗОВАТЕЛЯ ==================== -->
+<div class="overlay" id="user-overlay" hidden>
+  <div class="modal">
+    <h3>Изменить пользователя</h3>
+    <form id="user-form">
+      <input type="hidden" id="user-id">
+      <div class="field">
+        <label for="user-name">Имя</label>
+        <input type="text" id="user-name" required>
+      </div>
+      <div class="field">
+        <label for="user-dept">Отдел</label>
+        <input type="text" id="user-dept" required>
+      </div>
+      <div class="error-text" id="user-error"></div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" id="user-cancel">Отмена</button>
+        <button type="submit" class="btn btn-primary">Сохранить</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ==================== ПОДТВЕРЖДЕНИЕ УДАЛЕНИЯ ==================== -->
+<div class="overlay" id="confirm-overlay" hidden>
+  <div class="modal">
+    <h3 id="confirm-title">Подтвердите действие</h3>
+    <div class="sub" id="confirm-sub"></div>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-ghost" id="confirm-no">Отмена</button>
+      <button type="button" class="btn btn-danger" id="confirm-yes">Удалить</button>
+    </div>
+  </div>
+</div>
+
+<script src="assets/config.js"></script>
+<script src="assets/common.js"></script>
+<script src="assets/admin.js"></script>
+</body>
+</html>
