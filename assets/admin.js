@@ -154,6 +154,9 @@ function bindRoomModal() {
   document.getElementById('add-room-btn').addEventListener('click', () => openRoomModal(null));
   document.getElementById('room-cancel').addEventListener('click', closeRoomModal);
   document.getElementById('room-form').addEventListener('submit', saveRoom);
+  document.getElementById('room-overlay').addEventListener('click', (e) => {
+    if (e.target.id === 'room-overlay') closeRoomModal();
+  });
 }
 
 function openRoomModal(room) {
@@ -241,6 +244,9 @@ async function loadUsers() {
 function bindUserModal() {
   document.getElementById('user-cancel').addEventListener('click', closeUserModal);
   document.getElementById('user-form').addEventListener('submit', saveUser);
+  document.getElementById('user-overlay').addEventListener('click', (e) => {
+    if (e.target.id === 'user-overlay') closeUserModal();
+  });
 }
 
 function openUserModal(user) {
@@ -332,6 +338,9 @@ function bindConfirmModal() {
   document.getElementById('confirm-yes').addEventListener('click', async () => {
     if (confirmCallback) await confirmCallback();
     closeConfirm();
+  });
+  document.getElementById('confirm-overlay').addEventListener('click', (e) => {
+    if (e.target.id === 'confirm-overlay') closeConfirm();
   });
 }
 

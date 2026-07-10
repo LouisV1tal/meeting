@@ -333,6 +333,17 @@ function bindModalEvents() {
       document.getElementById('booking-repeat-until').min = selectedDate;
     }
   });
+
+  // Клик по затемнённому фону закрывает модалку
+  document.getElementById('booking-overlay').addEventListener('click', (e) => {
+    if (e.target.id === 'booking-overlay') closeBookingModal();
+  });
+  document.getElementById('cancel-overlay').addEventListener('click', (e) => {
+    if (e.target.id === 'cancel-overlay') closeCancelModal();
+  });
+  document.getElementById('details-overlay').addEventListener('click', (e) => {
+    if (e.target.id === 'details-overlay') closeDetailsModal();
+  });
 }
 
 function openBookingModal(room, freeInterval) {

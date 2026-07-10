@@ -198,6 +198,9 @@ async function loadPosts() {
 function bindPostModal() {
   document.getElementById('post-modal-close').addEventListener('click', closePostModal);
   document.getElementById('post-comment-form').addEventListener('submit', submitPostComment);
+  document.getElementById('post-overlay').addEventListener('click', (e) => {
+    if (e.target.id === 'post-overlay') closePostModal();
+  });
 }
 
 async function openPostModal(post) {
