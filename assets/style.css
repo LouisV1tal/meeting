@@ -480,11 +480,25 @@ tr:last-child td { border-bottom: none; }
 .pin-card {
   background: #fffdf8;
   border: 1px solid var(--line);
+  border-left: 4px solid var(--line);
   border-radius: 3px;
   padding: 16px 14px 14px;
   box-shadow: 0 6px 14px rgba(46, 42, 34, 0.10), 0 1px 0 rgba(46, 42, 34, 0.04);
   position: relative;
   transform: rotate(var(--tilt, -1deg));
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+.pin-card:hover { transform: rotate(var(--tilt, -1deg)) translateY(-2px); }
+
+.pin-tag {
+  display: inline-block;
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 20px;
+  margin-bottom: 8px;
+  color: #fff;
 }
 .pin-card::before {
   content: '';
