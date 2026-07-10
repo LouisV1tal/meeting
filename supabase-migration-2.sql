@@ -1,55 +1,54 @@
 -- ============================================================
--- Миграция №2: комментарии, повторяющиеся брони, доска событий
+-- Миграция №3: теги для карточек, комментарии к постам, realtime
 -- Выполнить в Supabase: SQL Editor -> New query -> вставить -> Run
--- (можно выполнять на уже работающей базе, ничего не удаляет)
 -- ============================================================
 
--- ---------- Повторяющиеся брони ----------
-alter table bookings add column if not exists recurrence_id uuid;
-alter table bookings add column if not exists recurrence_rule text; -- 'daily' | 'weekly' | 'yearly' | null
+-- ---------- Цветовой тег для постов доски событий ----------
+alter table events add column if not exists tag text; -- 'news' | 'important' | 'holiday' | 'social' | null
 
-create index if not exists idx_bookings_recurrence on bookings(recurrence_id);
-
--- ---------- Комментарии к брони ----------
-create table if not exists booking_comments (
+-- ---------- Комментарии к постам доски событий ----------
+create table if not exists event_comments (
   id uuid primary key default gen_random_uuid(),
-  booking_id uuid not null references bookings(id) on delete cascade,
+  event_id uuid not null references events(id) on delete cascade,
   user_id uuid not null references app_users(id) on delete cascade,
   text text not null,
   created_at timestamptz not null default now()
 );
 
-create index if not exists idx_comments_booking on booking_comments(booking_id);
+create index if not exists idx_event_comments_event on event_comments(event_id);
 
-alter table booking_comments enable row level security;
-create policy "comments_select_all" on booking_comments for select using (true);
-create policy "comments_insert_all" on booking_comments for insert with check (true);
-create policy "comments_delete_all" on booking_comments for delete using (true);
+alter table event_comments enable row level security;
+create policy "event_comments_select_all" on event_comments for select using (true);
+create policy "event_comments_insert_all" on event_comments for insert with check (true);
+create policy "event_comments_delete_all" on event_comments for delete using (true);
 
--- ---------- Доска событий ----------
-create table if not exists events (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid not null references app_users(id) on delete cascade,
-  text text,
-  photo_url text,
-  created_at timestamptz not null default now()
-);
+-- ============================================================
+-- Realtime: включаем публикацию изменений для нужных таблиц,
+-- чтобы страницы обновлялись сами при чужих действиях.
+-- Обёрнуто в DO-блоки, чтобы повторный запуск миграции не падал
+-- с ошибкой "уже добавлено в публикацию".
+-- ============================================================
 
-alter table events enable row level security;
-create policy "events_select_all" on events for select using (true);
-create policy "events_insert_all" on events for insert with check (true);
-create policy "events_delete_all" on events for delete using (true);
+do $$
+begin
+  alter publication supabase_realtime add table bookings;
+exception when duplicate_object then null;
+end $$;
 
--- ---------- Хранилище фото для доски событий ----------
-insert into storage.buckets (id, name, public)
-values ('event-photos', 'event-photos', true)
-on conflict (id) do nothing;
+do $$
+begin
+  alter publication supabase_realtime add table booking_comments;
+exception when duplicate_object then null;
+end $$;
 
-create policy "event_photos_public_select" on storage.objects
-  for select using (bucket_id = 'event-photos');
+do $$
+begin
+  alter publication supabase_realtime add table events;
+exception when duplicate_object then null;
+end $$;
 
-create policy "event_photos_public_insert" on storage.objects
-  for insert with check (bucket_id = 'event-photos');
-
-create policy "event_photos_public_delete" on storage.objects
-  for delete using (bucket_id = 'event-photos');
+do $$
+begin
+  alter publication supabase_realtime add table event_comments;
+exception when duplicate_object then null;
+end $$;
