@@ -6,6 +6,14 @@ const WORK_START = 10; // 10:00
 const WORK_END = 19;   // 19:00
 const SESSION_KEY = 'mrb_session';
 
+/** Цветовые теги для карточек доски событий */
+const EVENT_TAGS = {
+  news:      { label: 'Новость',  color: '#4A7FB5' },
+  important: { label: 'Важное',   color: '#C1483D' },
+  holiday:   { label: 'Праздник', color: '#C1802E' },
+  social:    { label: 'Движ',     color: '#6E9A78' },
+};
+
 /** SHA-256 хэш строки, возвращает hex */
 async function sha256(text) {
   const data = new TextEncoder().encode(text);
@@ -83,6 +91,23 @@ function generateRecurrenceDates(startISO, untilISO, rule) {
     else break;
   }
   return dates;
+}
+
+/** Подписывается на realtime-изменения таблицы Supabase и вызывает callback (с debounce). */
+function subscribeToTable(table, callback, filter) {
+  let timer = null;
+  const debounced = () => {
+    clearTimeout(timer);
+    timer = setTimeout(callback, 250);
+  };
+
+  const config = { event: '*', schema: 'public', table };
+  if (filter) config.filter = filter;
+
+  return supabaseClient
+    .channel(`realtime:${table}:${filter || 'all'}:${Math.random().toString(36).slice(2)}`)
+    .on('postgres_changes', config, debounced)
+    .subscribe();
 }
 
 /** Отправляет сообщение в Telegram-чат через Bot API. Ошибки не прерывают основной сценарий,
