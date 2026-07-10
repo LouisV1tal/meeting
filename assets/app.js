@@ -358,6 +358,7 @@ async function submitBooking(e) {
   const purpose = document.getElementById('booking-purpose').value.trim();
   const repeatRule = document.getElementById('booking-repeat').value; // '' | daily | weekly | yearly
   const repeatUntil = document.getElementById('booking-repeat-until').value;
+  const room = pendingSlot.room; // сохраняем до закрытия модалки — closeBookingModal() обнулит pendingSlot
 
   if (!start || !end) return;
   if (timeToFloat(end) <= timeToFloat(start)) {
@@ -386,7 +387,7 @@ async function submitBooking(e) {
   const { data: fresh, error: freshErr } = await supabaseClient
     .from('bookings')
     .select('booking_date, start_time, end_time')
-    .eq('room_id', pendingSlot.room.id)
+    .eq('room_id', room.id)
     .in('booking_date', dates);
 
   if (freshErr) {
@@ -412,7 +413,7 @@ async function submitBooking(e) {
       skippedDates.push(d);
     } else {
       rowsToInsert.push({
-        room_id: pendingSlot.room.id,
+        room_id: room.id,
         user_id: currentUser.id,
         booking_date: d,
         start_time: start,
@@ -450,7 +451,7 @@ async function submitBooking(e) {
   const repeatLabel = { daily: 'каждый день', weekly: 'каждую неделю', yearly: 'каждый год' }[repeatRule] || '';
   const notifyLines = [
     `📅 <b>Новая бронь переговорки</b>`,
-    `Комната: ${pendingSlot.room.name}`,
+    `Комната: ${room.name}`,
     `Кто: ${currentUser.name} (${currentUser.department})`,
     rowsToInsert.length > 1
       ? `Даты: ${rowsToInsert[0].booking_date} → ${rowsToInsert[rowsToInsert.length - 1].booking_date} (${repeatLabel}, ${rowsToInsert.length} шт.)`
