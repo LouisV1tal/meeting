@@ -34,6 +34,19 @@
       <label for="post-text">Поделиться событием, новостью или фото офиса</label>
       <textarea id="post-text" rows="3" placeholder="Что нового? Например: «В пятницу командный обед в 13:00, все приглашены!»" style="resize:vertical; margin-bottom:10px;"></textarea>
 
+      <div class="field-row">
+        <div class="field" style="flex:1;">
+          <label for="post-tag">Тег (необязательно)</label>
+          <select id="post-tag">
+            <option value="">Без тега</option>
+            <option value="news">🔵 Новость</option>
+            <option value="important">🔴 Важное</option>
+            <option value="holiday">🟠 Праздник</option>
+            <option value="social">🟢 Движ</option>
+          </select>
+        </div>
+      </div>
+
       <div class="file-drop" id="file-drop">📎 Прикрепить фото (необязательно) — нажмите, чтобы выбрать файл</div>
       <input type="file" id="post-photo" accept="image/*" hidden>
       <img id="photo-preview" class="file-preview" alt="Превью фото">
@@ -48,6 +61,30 @@
 
     <div class="pin-grid" id="pin-grid">
       <div class="empty">Загрузка постов…</div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== МОДАЛКА ПОСТА + КОММЕНТАРИИ ==================== -->
+<div class="overlay" id="post-overlay" hidden>
+  <div class="modal">
+    <h3 id="post-modal-author"></h3>
+    <div class="sub" id="post-modal-date"></div>
+
+    <img id="post-modal-photo" style="width:100%; border-radius:8px; margin:12px 0; display:none;" alt="Фото к посту">
+    <div id="post-modal-text" style="font-size:14px; white-space:pre-wrap; margin-bottom:14px;"></div>
+
+    <div class="comments-block">
+      <label style="margin-bottom:8px;">Комментарии</label>
+      <div class="comments-list" id="post-comments-list"></div>
+      <form class="comment-form" id="post-comment-form">
+        <input type="text" id="post-comment-input" placeholder="Написать комментарий…" maxlength="500" required>
+        <button type="submit" class="btn btn-primary">Отправить</button>
+      </form>
+    </div>
+
+    <div class="modal-actions">
+      <button type="button" class="btn btn-ghost" id="post-modal-close">Закрыть</button>
     </div>
   </div>
 </div>
