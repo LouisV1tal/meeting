@@ -4,6 +4,8 @@
 
 let boardUser = null;
 let selectedPhotoFile = null;
+let pendingPostId = null;
+let postsCache = [];
 
 init();
 
@@ -18,7 +20,16 @@ function init() {
   document.getElementById('session-name').textContent = boardUser.name;
 
   bindComposer();
+  bindPostModal();
   loadPosts();
+  setupRealtime();
+}
+
+function setupRealtime() {
+  subscribeToTable('events', () => loadPosts());
+  subscribeToTable('event_comments', () => {
+    if (pendingPostId) loadPostComments(pendingPostId);
+  });
 }
 
 function bindComposer() {
@@ -67,6 +78,7 @@ async function submitPost() {
   errEl.textContent = '';
   const textEl = document.getElementById('post-text');
   const text = textEl.value.trim();
+  const tag = document.getElementById('post-tag').value || null;
   const submitBtn = document.getElementById('post-submit');
 
   if (!text && !selectedPhotoFile) {
@@ -101,6 +113,7 @@ async function submitPost() {
       user_id: boardUser.id,
       text,
       photo_url,
+      tag,
     }]);
 
     if (insertErr) {
@@ -110,6 +123,7 @@ async function submitPost() {
     }
 
     textEl.value = '';
+    document.getElementById('post-tag').value = '';
     document.getElementById('clear-photo-btn').click();
     showToast('Опубликовано на доске событий.');
     await loadPosts();
@@ -121,7 +135,6 @@ async function submitPost() {
 
 async function loadPosts() {
   const grid = document.getElementById('pin-grid');
-  grid.innerHTML = '<div class="empty">Загрузка постов…</div>';
 
   const { data, error } = await supabaseClient
     .from('events')
@@ -129,10 +142,12 @@ async function loadPosts() {
     .order('created_at', { ascending: false });
 
   if (error) {
-    grid.innerHTML = '<div class="empty">Не удалось загрузить доску событий. Проверьте, что в Supabase выполнена миграция (таблица events).</div>';
+    grid.innerHTML = '<div class="empty">Не удалось загрузить доску событий. Проверьте, что в Supabase выполнены миграции.</div>';
     console.error(error);
     return;
   }
+
+  postsCache = data;
 
   if (!data.length) {
     grid.innerHTML = '<div class="empty">Пока пусто — стань первым, кто что-то приколет на доску 📌</div>';
@@ -146,9 +161,13 @@ async function loadPosts() {
     card.className = 'pin-card';
     card.style.setProperty('--tilt', `${tilt}deg`);
 
+    const tagInfo = post.tag ? EVENT_TAGS[post.tag] : null;
+    if (tagInfo) card.style.borderLeftColor = tagInfo.color;
+
     const isMine = boardUser && post.user_id === boardUser.id;
 
     card.innerHTML = `
+      ${tagInfo ? `<span class="pin-tag" style="background:${tagInfo.color};">${escapeHtml(tagInfo.label)}</span>` : ''}
       ${post.photo_url ? `<img src="${escapeHtml(post.photo_url)}" alt="Фото к посту" loading="lazy">` : ''}
       ${post.text ? `<div class="pin-text">${escapeHtml(post.text)}</div>` : ''}
       <div class="pin-meta">
@@ -157,11 +176,14 @@ async function loadPosts() {
       </div>
       ${isMine ? `<div style="margin-top:8px; text-align:right;"><button class="pin-delete" data-del="${post.id}">Удалить</button></div>` : ''}
     `;
+
+    card.addEventListener('click', () => openPostModal(post));
     grid.appendChild(card);
   });
 
   grid.querySelectorAll('[data-del]').forEach((btn) =>
-    btn.addEventListener('click', async () => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
       if (!confirm('Удалить этот пост?')) return;
       const { error: delErr } = await supabaseClient.from('events').delete().eq('id', btn.dataset.del);
       if (delErr) showToast('Не удалось удалить пост.', true);
@@ -169,6 +191,94 @@ async function loadPosts() {
       await loadPosts();
     })
   );
+}
+
+// ---------------- POST DETAILS + COMMENTS MODAL ----------------
+
+function bindPostModal() {
+  document.getElementById('post-modal-close').addEventListener('click', closePostModal);
+  document.getElementById('post-comment-form').addEventListener('submit', submitPostComment);
+}
+
+async function openPostModal(post) {
+  pendingPostId = post.id;
+
+  document.getElementById('post-modal-author').textContent = post.app_users?.name || '—';
+  document.getElementById('post-modal-date').textContent =
+    `${post.app_users?.department || ''} · ${new Date(post.created_at).toLocaleString('ru-RU', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}`;
+
+  const photo = document.getElementById('post-modal-photo');
+  if (post.photo_url) {
+    photo.src = post.photo_url;
+    photo.style.display = 'block';
+  } else {
+    photo.style.display = 'none';
+  }
+
+  document.getElementById('post-modal-text').textContent = post.text || '';
+  document.getElementById('post-comment-input').value = '';
+  document.getElementById('post-overlay').hidden = false;
+
+  await loadPostComments(post.id);
+}
+
+function closePostModal() {
+  document.getElementById('post-overlay').hidden = true;
+  pendingPostId = null;
+}
+
+async function loadPostComments(postId) {
+  const list = document.getElementById('post-comments-list');
+  list.innerHTML = '<div class="comments-empty">Загрузка…</div>';
+
+  const { data, error } = await supabaseClient
+    .from('event_comments')
+    .select('*, app_users(name)')
+    .eq('event_id', postId)
+    .order('created_at', { ascending: true });
+
+  if (error) {
+    list.innerHTML = '<div class="comments-empty">Не удалось загрузить комментарии.</div>';
+    return;
+  }
+
+  if (!data.length) {
+    list.innerHTML = '<div class="comments-empty">Комментариев пока нет.</div>';
+    return;
+  }
+
+  list.innerHTML = data.map((c) => `
+    <div class="comment-item">
+      <div class="comment-meta">
+        <span>${escapeHtml(c.app_users?.name || '—')}</span>
+        <span>${new Date(c.created_at).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
+      </div>
+      <div class="comment-text">${escapeHtml(c.text)}</div>
+    </div>
+  `).join('');
+  list.scrollTop = list.scrollHeight;
+}
+
+async function submitPostComment(e) {
+  e.preventDefault();
+  if (!pendingPostId) return;
+  const input = document.getElementById('post-comment-input');
+  const text = input.value.trim();
+  if (!text) return;
+
+  const { error } = await supabaseClient.from('event_comments').insert([{
+    event_id: pendingPostId,
+    user_id: boardUser.id,
+    text,
+  }]);
+
+  if (error) {
+    showToast('Не удалось отправить комментарий.', true);
+    return;
+  }
+
+  input.value = '';
+  await loadPostComments(pendingPostId);
 }
 
 function escapeHtml(str) {
