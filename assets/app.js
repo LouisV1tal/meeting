@@ -45,6 +45,17 @@ async function showApp() {
   document.getElementById('date-human').textContent = formatDateHuman(selectedDate);
 
   await loadRoomsAndBookings();
+  setupRealtime();
+}
+
+function setupRealtime() {
+  // Календарь обновляется сам, если кто-то другой создал/отменил бронь
+  subscribeToTable('bookings', () => loadRoomsAndBookings());
+
+  // Если открыта карточка с комментариями — обновляем её живьём
+  subscribeToTable('booking_comments', () => {
+    if (pendingDetailsBooking) loadComments(pendingDetailsBooking.id);
+  });
 }
 
 // ---------------- AUTH ----------------
