@@ -23,4 +23,4 @@ const ADMIN_PASSWORD = 'vitalik2001';
 const TELEGRAM_BOT_TOKEN = '8276286798:AAGQkNsrsBiGn1h_BtjTC_W2bT5cQXJ7J_A';
 const TELEGRAM_CHAT_ID = '8276286798';
 
-const supabaseClient = window.supabase.createClient(https://fgchfyesqquvtkjwpqfi.supabase.co, eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZnY2hmeWVzcXF1dnRrandwcWZpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM1OTUzNTksImV4cCI6MjA5OTE3MTM1OX0.Q3ddRm2SGKSflD3qGmTvMVrRZzkJlgbOC22ZRJAAP9U);
+const supabaseClient = window.supabase.createClient('https://fgchfyesqquvtkjwpqfi.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZnY2hmeWVzcXF1dnRrandwcWZpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM1OTUzNTksImV4cCI6MjA5OTE3MTM1OX0.Q3ddRm2SGKSflD3qGmTvMVrRZzkJlgbOC22ZRJAAP9U');
