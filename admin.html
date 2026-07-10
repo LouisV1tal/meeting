@@ -38,7 +38,8 @@
       <h1>Админ-панель</h1>
     </div>
     <div class="session">
-      <a href="index.html" class="link-btn">Перейти к бронированию</a>
+      <a href="index.html" class="nav-link">К бронированию</a>
+      <a href="events.html" class="nav-link">Доска событий</a>
       <button class="btn btn-ghost" id="admin-logout">Выйти</button>
     </div>
   </div>
@@ -68,6 +69,18 @@
       <tbody id="users-tbody"></tbody>
     </table>
     <div id="users-empty" class="empty" hidden>Пользователей пока нет.</div>
+  </div>
+
+  <!-- Доска событий: модерация -->
+  <div class="panel">
+    <h2>Доска событий — модерация</h2>
+    <table id="events-table">
+      <thead>
+        <tr><th>Автор</th><th>Текст</th><th>Фото</th><th>Дата</th><th></th></tr>
+      </thead>
+      <tbody id="events-tbody"></tbody>
+    </table>
+    <div id="events-empty" class="empty" hidden>Постов пока нет.</div>
   </div>
 
   <!-- Брони -->

@@ -52,6 +52,51 @@ function showAdminApp() {
   loadRooms();
   loadUsers();
   loadBookings();
+  loadEventsModeration();
+}
+
+// ---------------- EVENTS BOARD MODERATION ----------------
+
+async function loadEventsModeration() {
+  const { data, error } = await supabaseClient
+    .from('events')
+    .select('*, app_users(name)')
+    .order('created_at', { ascending: false });
+
+  const tbody = document.getElementById('events-tbody');
+  const empty = document.getElementById('events-empty');
+  tbody.innerHTML = '';
+
+  if (error) {
+    showToast('Не удалось загрузить доску событий.', true);
+    return;
+  }
+  empty.hidden = data.length > 0;
+
+  data.forEach((post) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${escapeHtml(post.app_users?.name || '—')}</td>
+      <td style="max-width:280px; white-space:pre-wrap;">${escapeHtml(post.text || '—')}</td>
+      <td>${post.photo_url ? '<span class="badge">есть фото</span>' : '—'}</td>
+      <td>${new Date(post.created_at).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</td>
+      <td style="text-align:right;">
+        <button class="link-btn" style="color:var(--danger);" data-del-post="${post.id}">Удалить</button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  tbody.querySelectorAll('[data-del-post]').forEach((btn) =>
+    btn.addEventListener('click', () => {
+      openConfirm('Удалить пост?', 'Пост будет удалён с доски событий безвозвратно.', async () => {
+        const { error: delErr } = await supabaseClient.from('events').delete().eq('id', btn.dataset.delPost);
+        if (delErr) showToast('Не удалось удалить пост.', true);
+        else showToast('Пост удалён.');
+        loadEventsModeration();
+      });
+    })
+  );
 }
 
 // ---------------- ROOMS ----------------

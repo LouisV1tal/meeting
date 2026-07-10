@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Доска событий · Переговорки</title>
+<link rel="stylesheet" href="assets/style.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+
+<!-- Если не вошли — просим войти на главной -->
+<div id="guard" class="shell auth-wrap" hidden>
+  <div class="panel" style="text-align:center;">
+    <p>Чтобы писать на доску событий, сначала войдите.</p>
+    <a href="index.html" class="btn btn-primary" style="display:inline-block; margin-top:8px;">Перейти ко входу</a>
+  </div>
+</div>
+
+<div id="board-section" class="shell" hidden>
+  <div class="topbar">
+    <div class="brand">
+      <span class="mark">RM</span>
+      <h1>Доска событий</h1>
+    </div>
+    <div class="session">
+      <a href="index.html" class="nav-link">К бронированию</a>
+      <span>Вы вошли как <strong id="session-name"></strong></span>
+    </div>
+  </div>
+
+  <div class="corkboard">
+    <div class="composer">
+      <label for="post-text">Поделиться событием, новостью или фото офиса</label>
+      <textarea id="post-text" rows="3" placeholder="Что нового? Например: «В пятницу командный обед в 13:00, все приглашены!»" style="resize:vertical; margin-bottom:10px;"></textarea>
+
+      <div class="file-drop" id="file-drop">📎 Прикрепить фото (необязательно) — нажмите, чтобы выбрать файл</div>
+      <input type="file" id="post-photo" accept="image/*" hidden>
+      <img id="photo-preview" class="file-preview" alt="Превью фото">
+
+      <div class="error-text" id="post-error"></div>
+
+      <div style="display:flex; justify-content:flex-end; margin-top:12px; gap:10px;">
+        <button type="button" class="btn btn-ghost" id="clear-photo-btn" hidden>Убрать фото</button>
+        <button type="button" class="btn btn-primary" id="post-submit">Опубликовать</button>
+      </div>
+    </div>
+
+    <div class="pin-grid" id="pin-grid">
+      <div class="empty">Загрузка постов…</div>
+    </div>
+  </div>
+</div>
+
+<script src="assets/config.js"></script>
+<script src="assets/common.js"></script>
+<script src="assets/events.js"></script>
+</body>
+</html>

@@ -70,6 +70,7 @@
       <h1>Переговорки</h1>
     </div>
     <div class="session">
+      <a href="events.html" class="nav-link">Доска событий</a>
       <span>Вы вошли как <strong id="session-name"></strong> <span class="badge" id="session-dept"></span></span>
       <button class="btn btn-ghost" id="logout-btn">Выйти</button>
     </div>
@@ -107,6 +108,22 @@
       <div class="hint" style="margin-top:-8px; margin-bottom:14px;">Шаг по умолчанию — 1 час, но время можно ввести вручную с точностью до минуты.</div>
 
       <div class="field">
+        <label for="booking-repeat">Повторять</label>
+        <select id="booking-repeat">
+          <option value="">Не повторять</option>
+          <option value="daily">Каждый день</option>
+          <option value="weekly">Каждую неделю</option>
+          <option value="yearly">Каждый год</option>
+        </select>
+      </div>
+
+      <div class="field" id="repeat-until-field" hidden>
+        <label for="booking-repeat-until">Повторять до какой даты (включительно)</label>
+        <input type="date" id="booking-repeat-until">
+        <div class="hint">Слоты, которые окажутся заняты в какую-то из дат, будут пропущены — остальные создадутся.</div>
+      </div>
+
+      <div class="field">
         <label for="booking-purpose">Цель встречи</label>
         <input type="text" id="booking-purpose" placeholder="Например, созвон с партнёром">
       </div>
@@ -126,11 +143,46 @@
   </div>
 </div>
 
+<!-- ==================== МОДАЛКА ДЕТАЛЕЙ БРОНИ + КОММЕНТАРИИ ==================== -->
+<div class="overlay" id="details-overlay" hidden>
+  <div class="modal">
+    <h3>Бронь переговорки</h3>
+    <div class="sub" id="details-room-label"></div>
+
+    <div style="margin: 14px 0;">
+      <div class="details-row"><span class="k">Время</span><span class="v" id="details-time"></span></div>
+      <div class="details-row"><span class="k">Кто забронировал</span><span class="v" id="details-who"></span></div>
+      <div class="details-row"><span class="k">Отдел</span><span class="v" id="details-dept"></span></div>
+      <div class="details-row"><span class="k">Цель</span><span class="v" id="details-purpose"></span></div>
+    </div>
+
+    <div class="comments-block">
+      <label style="margin-bottom:8px;">Комментарии</label>
+      <div class="comments-list" id="comments-list"></div>
+      <form class="comment-form" id="comment-form">
+        <input type="text" id="comment-input" placeholder="Написать комментарий…" maxlength="500" required>
+        <button type="submit" class="btn btn-primary">Отправить</button>
+      </form>
+    </div>
+
+    <div class="modal-actions">
+      <button type="button" class="btn btn-danger" id="details-cancel-booking" hidden>Отменить бронь</button>
+      <button type="button" class="btn btn-ghost" id="details-close">Закрыть</button>
+    </div>
+  </div>
+</div>
+
 <!-- ==================== МОДАЛКА ОТМЕНЫ БРОНИ ==================== -->
 <div class="overlay" id="cancel-overlay" hidden>
   <div class="modal">
     <h3>Отменить бронь?</h3>
     <div class="sub" id="cancel-details"></div>
+    <div class="field" id="cancel-all-field" hidden style="margin-top:14px;">
+      <label style="display:flex; align-items:center; gap:8px;">
+        <input type="checkbox" id="cancel-all-recurring" style="width:auto;">
+        <span>Это повторяющаяся бронь — отменить все повторения, а не только эту дату</span>
+      </label>
+    </div>
     <div class="modal-actions">
       <button type="button" class="btn btn-ghost" id="cancel-no">Оставить</button>
       <button type="button" class="btn btn-danger" id="cancel-yes">Отменить бронь</button>

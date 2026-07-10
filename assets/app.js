@@ -7,6 +7,7 @@ let selectedDate = todayISO();
 let roomsCache = [];
 let pendingSlot = null; // { roomId, roomName, start, end }
 let pendingCancelId = null;
+let pendingDetailsBooking = null;
 
 const authSection = document.getElementById('auth-section');
 const appSection = document.getElementById('app-section');
@@ -277,20 +278,12 @@ function renderRuler(room, roomBookings) {
     const el = document.createElement('div');
     el.className = 'slot busy';
     placeBlock(bi.start, bi.end, el);
-    const isMine = currentUser && bi.booking.user_id === currentUser.id;
     el.innerHTML = `
       <span class="slot-name">${escapeHtml(bi.booking.app_users?.name || 'Занято')}</span>
       <span>${bi.booking.start_time.slice(0,5)}–${bi.booking.end_time.slice(0,5)}${bi.booking.purpose ? ' · ' + escapeHtml(bi.booking.purpose) : ''}</span>
     `;
-    if (isMine) {
-      el.style.cursor = 'pointer';
-      el.title = 'Нажмите, чтобы отменить свою бронь';
-      el.addEventListener('click', () => openCancelModal(bi.booking));
-    } else {
-      el.addEventListener('click', () => {
-        showToast(`Занято: ${bi.booking.app_users?.name || '—'} (${bi.booking.department})${bi.booking.purpose ? ' — ' + bi.booking.purpose : ''}`);
-      });
-    }
+    el.title = 'Нажмите, чтобы посмотреть детали и комментарии';
+    el.addEventListener('click', () => openDetailsModal(room, bi.booking));
     ruler.appendChild(el);
   });
 
@@ -313,10 +306,27 @@ function bindModalEvents() {
 
   document.getElementById('cancel-no').addEventListener('click', closeCancelModal);
   document.getElementById('cancel-yes').addEventListener('click', confirmCancel);
+
+  document.getElementById('details-close').addEventListener('click', closeDetailsModal);
+  document.getElementById('details-cancel-booking').addEventListener('click', () => {
+    const booking = pendingDetailsBooking;
+    closeDetailsModal();
+    openCancelModal(booking);
+  });
+  document.getElementById('comment-form').addEventListener('submit', submitComment);
+
+  document.getElementById('booking-repeat').addEventListener('change', (e) => {
+    const untilField = document.getElementById('repeat-until-field');
+    untilField.hidden = !e.target.value;
+    if (e.target.value) {
+      document.getElementById('booking-repeat-until').min = selectedDate;
+    }
+  });
 }
 
 function openBookingModal(room, freeInterval) {
   closeCancelModal();
+  closeDetailsModal();
   pendingSlot = { room };
   document.getElementById('booking-room-label').textContent = `${room.name} · ${formatDateHuman(selectedDate)}`;
 
@@ -325,6 +335,9 @@ function openBookingModal(room, freeInterval) {
   document.getElementById('booking-end').value = floatToTime(suggestedEnd);
   document.getElementById('booking-purpose').value = '';
   document.getElementById('booking-dept').value = currentUser.department;
+  document.getElementById('booking-repeat').value = '';
+  document.getElementById('repeat-until-field').hidden = true;
+  document.getElementById('booking-repeat-until').value = '';
   document.getElementById('booking-error').textContent = '';
 
   document.getElementById('booking-overlay').hidden = false;
@@ -343,6 +356,8 @@ async function submitBooking(e) {
   const start = document.getElementById('booking-start').value;
   const end = document.getElementById('booking-end').value;
   const purpose = document.getElementById('booking-purpose').value.trim();
+  const repeatRule = document.getElementById('booking-repeat').value; // '' | daily | weekly | yearly
+  const repeatUntil = document.getElementById('booking-repeat-until').value;
 
   if (!start || !end) return;
   if (timeToFloat(end) <= timeToFloat(start)) {
@@ -353,37 +368,70 @@ async function submitBooking(e) {
     errEl.textContent = `Бронирование доступно с ${WORK_START}:00 до ${WORK_END}:00.`;
     return;
   }
+  if (repeatRule && !repeatUntil) {
+    errEl.textContent = 'Укажите дату, до которой повторять бронь.';
+    return;
+  }
 
-  // Повторно проверяем пересечения на актуальных данных перед записью
+  const dates = repeatRule
+    ? generateRecurrenceDates(selectedDate, repeatUntil, repeatRule)
+    : [selectedDate];
+
+  if (repeatRule && dates.length > 1) {
+    const confirmMsg = `Будет создано до ${dates.length} броней (${selectedDate} → ${repeatUntil}). Даты, где слот уже занят, будут пропущены. Продолжить?`;
+    if (!confirm(confirmMsg)) return;
+  }
+
+  // Проверяем занятость по всем датам разом
   const { data: fresh, error: freshErr } = await supabaseClient
     .from('bookings')
-    .select('start_time, end_time')
+    .select('booking_date, start_time, end_time')
     .eq('room_id', pendingSlot.room.id)
-    .eq('booking_date', selectedDate);
+    .in('booking_date', dates);
 
   if (freshErr) {
     errEl.textContent = 'Ошибка проверки доступности. Попробуйте снова.';
     return;
   }
 
-  const conflict = fresh.some((b) =>
-    intervalsOverlap(timeToFloat(start), timeToFloat(end), timeToFloat(b.start_time), timeToFloat(b.end_time))
-  );
-  if (conflict) {
-    errEl.textContent = 'Это время уже заняли — обновите страницу и выберите другой слот.';
+  const busyByDate = {};
+  fresh.forEach((b) => {
+    (busyByDate[b.booking_date] = busyByDate[b.booking_date] || []).push(b);
+  });
+
+  const recurrenceId = dates.length > 1 ? crypto.randomUUID() : null;
+  const rowsToInsert = [];
+  const skippedDates = [];
+
+  dates.forEach((d) => {
+    const dayBookings = busyByDate[d] || [];
+    const conflict = dayBookings.some((b) =>
+      intervalsOverlap(timeToFloat(start), timeToFloat(end), timeToFloat(b.start_time), timeToFloat(b.end_time))
+    );
+    if (conflict) {
+      skippedDates.push(d);
+    } else {
+      rowsToInsert.push({
+        room_id: pendingSlot.room.id,
+        user_id: currentUser.id,
+        booking_date: d,
+        start_time: start,
+        end_time: end,
+        purpose,
+        department: currentUser.department,
+        recurrence_id: recurrenceId,
+        recurrence_rule: recurrenceId ? repeatRule : null,
+      });
+    }
+  });
+
+  if (!rowsToInsert.length) {
+    errEl.textContent = 'Все выбранные даты уже заняты — обновите страницу и выберите другое время.';
     await loadRoomsAndBookings();
     return;
   }
 
-  const { error: insertErr } = await supabaseClient.from('bookings').insert([{
-    room_id: pendingSlot.room.id,
-    user_id: currentUser.id,
-    booking_date: selectedDate,
-    start_time: start,
-    end_time: end,
-    purpose,
-    department: currentUser.department,
-  }]);
+  const { error: insertErr } = await supabaseClient.from('bookings').insert(rowsToInsert);
 
   if (insertErr) {
     errEl.textContent = 'Не удалось создать бронь. Попробуйте ещё раз.';
@@ -392,28 +440,142 @@ async function submitBooking(e) {
   }
 
   closeBookingModal();
-  showToast('Переговорка забронирована.');
+
+  if (rowsToInsert.length > 1) {
+    showToast(`Создано ${rowsToInsert.length} броней${skippedDates.length ? `, пропущено ${skippedDates.length} (занято)` : ''}.`);
+  } else {
+    showToast('Переговорка забронирована.');
+  }
+
+  const repeatLabel = { daily: 'каждый день', weekly: 'каждую неделю', yearly: 'каждый год' }[repeatRule] || '';
+  const notifyLines = [
+    `📅 <b>Новая бронь переговорки</b>`,
+    `Комната: ${pendingSlot.room.name}`,
+    `Кто: ${currentUser.name} (${currentUser.department})`,
+    rowsToInsert.length > 1
+      ? `Даты: ${rowsToInsert[0].booking_date} → ${rowsToInsert[rowsToInsert.length - 1].booking_date} (${repeatLabel}, ${rowsToInsert.length} шт.)`
+      : `Дата: ${rowsToInsert[0].booking_date}`,
+    `Время: ${start}–${end}`,
+    purpose ? `Цель: ${purpose}` : null,
+  ].filter(Boolean);
+  sendTelegramNotification(notifyLines.join('\n'));
+
   await loadRoomsAndBookings();
+}
+
+// ---------------- DETAILS + COMMENTS MODAL ----------------
+
+async function openDetailsModal(room, booking) {
+  closeBookingModal();
+  closeCancelModal();
+  pendingDetailsBooking = booking;
+
+  document.getElementById('details-room-label').textContent = `${room.name} · ${formatDateHuman(selectedDate)}`;
+  document.getElementById('details-time').textContent = `${booking.start_time.slice(0,5)}–${booking.end_time.slice(0,5)}`
+    + (booking.recurrence_rule ? ` · 🔁 ${({daily:'ежедневно', weekly:'еженедельно', yearly:'ежегодно'})[booking.recurrence_rule] || ''}` : '');
+  document.getElementById('details-who').textContent = booking.app_users?.name || '—';
+  document.getElementById('details-dept').textContent = booking.department;
+  document.getElementById('details-purpose').textContent = booking.purpose || '—';
+
+  const isMine = currentUser && booking.user_id === currentUser.id;
+  document.getElementById('details-cancel-booking').hidden = !isMine;
+
+  document.getElementById('comment-input').value = '';
+  document.getElementById('details-overlay').hidden = false;
+
+  await loadComments(booking.id);
+}
+
+function closeDetailsModal() {
+  document.getElementById('details-overlay').hidden = true;
+  pendingDetailsBooking = null;
+}
+
+async function loadComments(bookingId) {
+  const list = document.getElementById('comments-list');
+  list.innerHTML = '<div class="comments-empty">Загрузка…</div>';
+
+  const { data, error } = await supabaseClient
+    .from('booking_comments')
+    .select('*, app_users(name)')
+    .eq('booking_id', bookingId)
+    .order('created_at', { ascending: true });
+
+  if (error) {
+    list.innerHTML = '<div class="comments-empty">Не удалось загрузить комментарии.</div>';
+    return;
+  }
+
+  if (!data.length) {
+    list.innerHTML = '<div class="comments-empty">Комментариев пока нет.</div>';
+    return;
+  }
+
+  list.innerHTML = data.map((c) => `
+    <div class="comment-item">
+      <div class="comment-meta">
+        <span>${escapeHtml(c.app_users?.name || '—')}</span>
+        <span>${new Date(c.created_at).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
+      </div>
+      <div class="comment-text">${escapeHtml(c.text)}</div>
+    </div>
+  `).join('');
+  list.scrollTop = list.scrollHeight;
+}
+
+async function submitComment(e) {
+  e.preventDefault();
+  if (!pendingDetailsBooking) return;
+  const input = document.getElementById('comment-input');
+  const text = input.value.trim();
+  if (!text) return;
+
+  const { error } = await supabaseClient.from('booking_comments').insert([{
+    booking_id: pendingDetailsBooking.id,
+    user_id: currentUser.id,
+    text,
+  }]);
+
+  if (error) {
+    showToast('Не удалось отправить комментарий.', true);
+    return;
+  }
+
+  input.value = '';
+  await loadComments(pendingDetailsBooking.id);
 }
 
 // ---------------- CANCEL MODAL ----------------
 
+let pendingCancelRecurrenceId = null;
+
 function openCancelModal(booking) {
   closeBookingModal();
+  closeDetailsModal();
   pendingCancelId = booking.id;
+  pendingCancelRecurrenceId = booking.recurrence_id || null;
   document.getElementById('cancel-details').textContent =
     `${booking.start_time.slice(0,5)}–${booking.end_time.slice(0,5)}, ${formatDateHuman(selectedDate)}`;
+  document.getElementById('cancel-all-field').hidden = !pendingCancelRecurrenceId;
+  document.getElementById('cancel-all-recurring').checked = false;
   document.getElementById('cancel-overlay').hidden = false;
 }
 
 function closeCancelModal() {
   document.getElementById('cancel-overlay').hidden = true;
   pendingCancelId = null;
+  pendingCancelRecurrenceId = null;
 }
 
 async function confirmCancel() {
   if (!pendingCancelId) return;
-  const { error } = await supabaseClient.from('bookings').delete().eq('id', pendingCancelId);
+  const cancelAll = pendingCancelRecurrenceId && document.getElementById('cancel-all-recurring').checked;
+
+  const query = cancelAll
+    ? supabaseClient.from('bookings').delete().eq('recurrence_id', pendingCancelRecurrenceId)
+    : supabaseClient.from('bookings').delete().eq('id', pendingCancelId);
+
+  const { error } = await query;
   if (error) {
     showToast('Не удалось отменить бронь.', true);
   } else {

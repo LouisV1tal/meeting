@@ -67,3 +67,34 @@ function showToast(message, isError = false) {
 function intervalsOverlap(aStart, aEnd, bStart, bEnd) {
   return aStart < bEnd && bStart < aEnd;
 }
+
+/** Генерирует список дат (ISO) от startISO до untilISO включительно с заданным шагом.
+ *  rule: 'daily' | 'weekly' | 'yearly'. Ограничение — не более 366 дат. */
+function generateRecurrenceDates(startISO, untilISO, rule) {
+  const dates = [];
+  let cursor = new Date(startISO + 'T00:00:00');
+  const end = new Date(untilISO + 'T00:00:00');
+
+  while (cursor <= end && dates.length < 366) {
+    dates.push(cursor.toISOString().slice(0, 10));
+    if (rule === 'daily') cursor.setDate(cursor.getDate() + 1);
+    else if (rule === 'weekly') cursor.setDate(cursor.getDate() + 7);
+    else if (rule === 'yearly') cursor.setFullYear(cursor.getFullYear() + 1);
+    else break;
+  }
+  return dates;
+}
+
+/** Отправляет сообщение в Telegram-чат через Bot API. Ошибки не прерывают основной сценарий. */
+async function sendTelegramNotification(text) {
+  if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID || TELEGRAM_BOT_TOKEN.startsWith('YOUR-')) return;
+  try {
+    await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: TELEGRAM_CHAT_ID, text, parse_mode: 'HTML' }),
+    });
+  } catch (err) {
+    console.warn('Telegram notification failed:', err);
+  }
+}
