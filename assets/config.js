@@ -8,7 +8,7 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 // Пароль от админ-панели (меняй на свой перед публикацией).
 // Хранится только на фронтенде — это простая защита от случайных
 // людей, а не криптографическая защита от целенаправленной атаки.
-const ADMIN_PASSWORD = 'change-me-123';
+const ADMIN_PASSWORD = 'vitalik2001';
 
 // ============================================================
 // Telegram-уведомления о новых бронях переговорок (необязательно).
@@ -23,4 +23,4 @@ const ADMIN_PASSWORD = 'change-me-123';
 const TELEGRAM_BOT_TOKEN = '8276286798:AAGQkNsrsBiGn1h_BtjTC_W2bT5cQXJ7J_A';
 const TELEGRAM_CHAT_ID = '8276286798';
 
-const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const supabaseClient = window.supabase.createClient(https://fgchfyesqquvtkjwpqfi.supabase.co, eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZnY2hmeWVzcXF1dnRrandwcWZpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM1OTUzNTksImV4cCI6MjA5OTE3MTM1OX0.Q3ddRm2SGKSflD3qGmTvMVrRZzkJlgbOC22ZRJAAP9U);
