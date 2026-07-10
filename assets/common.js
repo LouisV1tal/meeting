@@ -85,16 +85,26 @@ function generateRecurrenceDates(startISO, untilISO, rule) {
   return dates;
 }
 
-/** Отправляет сообщение в Telegram-чат через Bot API. Ошибки не прерывают основной сценарий. */
+/** Отправляет сообщение в Telegram-чат через Bot API. Ошибки не прерывают основной сценарий,
+ *  но подробно логируются в консоль — так их видно при отладке. */
 async function sendTelegramNotification(text) {
-  if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID || TELEGRAM_BOT_TOKEN.startsWith('YOUR-')) return;
+  if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID || TELEGRAM_BOT_TOKEN.startsWith('YOUR-')) {
+    console.warn('Telegram: токен или chat_id не заполнены в config.js — уведомление не отправлено.');
+    return;
+  }
   try {
-    await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+    const res = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ chat_id: TELEGRAM_CHAT_ID, text, parse_mode: 'HTML' }),
     });
+    const body = await res.json().catch(() => null);
+    if (!res.ok) {
+      console.error('Telegram notification error:', res.status, body);
+    } else {
+      console.log('Telegram notification sent:', body);
+    }
   } catch (err) {
-    console.warn('Telegram notification failed:', err);
+    console.warn('Telegram notification failed (network):', err);
   }
 }
