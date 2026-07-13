@@ -155,7 +155,7 @@ function bindRoomModal() {
   document.getElementById('room-cancel').addEventListener('click', closeRoomModal);
   document.getElementById('room-form').addEventListener('submit', saveRoom);
   document.getElementById('room-overlay').addEventListener('click', (e) => {
-    if (e.target.id === 'room-overlay') closeRoomModal();
+    if (e.target === e.currentTarget) closeRoomModal();
   });
 }
 
@@ -245,7 +245,7 @@ function bindUserModal() {
   document.getElementById('user-cancel').addEventListener('click', closeUserModal);
   document.getElementById('user-form').addEventListener('submit', saveUser);
   document.getElementById('user-overlay').addEventListener('click', (e) => {
-    if (e.target.id === 'user-overlay') closeUserModal();
+    if (e.target === e.currentTarget) closeUserModal();
   });
 }
 
@@ -340,7 +340,15 @@ function bindConfirmModal() {
     closeConfirm();
   });
   document.getElementById('confirm-overlay').addEventListener('click', (e) => {
-    if (e.target.id === 'confirm-overlay') closeConfirm();
+    if (e.target === e.currentTarget) closeConfirm();
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      closeRoomModal();
+      closeUserModal();
+      closeConfirm();
+    }
   });
 }
 

@@ -336,13 +336,21 @@ function bindModalEvents() {
 
   // Клик по затемнённому фону закрывает модалку
   document.getElementById('booking-overlay').addEventListener('click', (e) => {
-    if (e.target.id === 'booking-overlay') closeBookingModal();
+    if (e.target === e.currentTarget) closeBookingModal();
   });
   document.getElementById('cancel-overlay').addEventListener('click', (e) => {
-    if (e.target.id === 'cancel-overlay') closeCancelModal();
+    if (e.target === e.currentTarget) closeCancelModal();
   });
   document.getElementById('details-overlay').addEventListener('click', (e) => {
-    if (e.target.id === 'details-overlay') closeDetailsModal();
+    if (e.target === e.currentTarget) closeDetailsModal();
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      closeBookingModal();
+      closeCancelModal();
+      closeDetailsModal();
+    }
   });
 }
 

@@ -359,13 +359,9 @@ input:focus, select:focus, textarea:focus {
   display: flex;
   gap: 10px;
   justify-content: flex-end;
-  position: sticky;
-  bottom: 0;
-  background: var(--panel);
-  padding: 14px 0 2px;
-  margin: 18px -22px -22px;
-  padding-left: 22px;
-  padding-right: 22px;
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
 }
 
 /* ---------- Table (admin) ---------- */
@@ -441,10 +437,7 @@ tr:last-child td { border-bottom: none; }
 
 .comments-block { margin-top: 4px; }
 .comments-list {
-  max-height: 180px;
-  overflow-y: auto;
   margin: 10px 0;
-  padding-right: 4px;
 }
 .comment-item {
   background: var(--panel-2);
