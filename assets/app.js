@@ -334,12 +334,14 @@ function bindModalEvents() {
     }
   });
 
-  document.getElementById('booking-start').addEventListener('change', (e) => {
+  const autoSetEnd = (e) => {
     const startVal = e.target.value;
     if (!startVal) return;
     const suggestedEnd = Math.min(timeToFloat(startVal) + 1, WORK_END);
     document.getElementById('booking-end').value = floatToTime(suggestedEnd);
-  });
+  };
+  document.getElementById('booking-start').addEventListener('change', autoSetEnd);
+  document.getElementById('booking-start').addEventListener('input', autoSetEnd);
 
   // Клик по затемнённому фону закрывает модалку
   document.getElementById('booking-overlay').addEventListener('click', (e) => {

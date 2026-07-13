@@ -318,17 +318,27 @@ async function loadBookings() {
     tbody.appendChild(tr);
   });
 
-  tbody.querySelectorAll('[data-cancel]').forEach((btn) =>
+  tbody.querySelectorAll('[data-cancel]').forEach((btn) => {
+    const booking = data.find((b) => b.id === btn.dataset.cancel);
     btn.addEventListener('click', () => {
       openConfirm('Отменить бронь?', 'Слот снова станет свободным для бронирования.', async () => {
         const { error: delErr } = await supabaseClient.from('bookings').delete().eq('id', btn.dataset.cancel);
-        if (delErr) showToast('Не удалось отменить бронь.', true);
-        else showToast('Бронь отменена.');
+        if (delErr) {
+          showToast('Не удалось отменить бронь.', true);
+        } else {
+          showToast('Бронь отменена.');
+          sendTelegramNotification([
+            `❌ <b>Бронь отменена (админ-панель)</b>`,
+            `Комната: ${booking?.rooms?.name || '—'}`,
+            `Была на: ${booking?.app_users?.name || '—'} (${booking?.department || ''})`,
+            `Дата: ${booking?.booking_date || bookingsDate}, время: ${booking?.start_time?.slice(0,5)}–${booking?.end_time?.slice(0,5)}`,
+          ].join('\n'));
+        }
         loadBookings();
       });
       confirmCallback && (document.getElementById('confirm-yes').textContent = 'Отменить бронь');
-    })
-  );
+    });
+  });
 }
 
 // ---------------- CONFIRM MODAL ----------------
