@@ -334,6 +334,13 @@ function bindModalEvents() {
     }
   });
 
+  document.getElementById('booking-start').addEventListener('change', (e) => {
+    const startVal = e.target.value;
+    if (!startVal) return;
+    const suggestedEnd = Math.min(timeToFloat(startVal) + 1, WORK_END);
+    document.getElementById('booking-end').value = floatToTime(suggestedEnd);
+  });
+
   // Клик по затемнённому фону закрывает модалку
   document.getElementById('booking-overlay').addEventListener('click', (e) => {
     if (e.target === e.currentTarget) closeBookingModal();
@@ -579,12 +586,14 @@ async function submitComment(e) {
 // ---------------- CANCEL MODAL ----------------
 
 let pendingCancelRecurrenceId = null;
+let pendingCancelBooking = null;
 
 function openCancelModal(booking) {
   closeBookingModal();
   closeDetailsModal();
   pendingCancelId = booking.id;
   pendingCancelRecurrenceId = booking.recurrence_id || null;
+  pendingCancelBooking = booking;
   document.getElementById('cancel-details').textContent =
     `${booking.start_time.slice(0,5)}–${booking.end_time.slice(0,5)}, ${formatDateHuman(selectedDate)}`;
   document.getElementById('cancel-all-field').hidden = !pendingCancelRecurrenceId;
@@ -596,11 +605,13 @@ function closeCancelModal() {
   document.getElementById('cancel-overlay').hidden = true;
   pendingCancelId = null;
   pendingCancelRecurrenceId = null;
+  pendingCancelBooking = null;
 }
 
 async function confirmCancel() {
   if (!pendingCancelId) return;
   const cancelAll = pendingCancelRecurrenceId && document.getElementById('cancel-all-recurring').checked;
+  const booking = pendingCancelBooking;
 
   const query = cancelAll
     ? supabaseClient.from('bookings').delete().eq('recurrence_id', pendingCancelRecurrenceId)
@@ -609,9 +620,25 @@ async function confirmCancel() {
   const { error } = await query;
   if (error) {
     showToast('Не удалось отменить бронь.', true);
-  } else {
-    showToast('Бронь отменена.');
+    closeCancelModal();
+    return;
   }
+
+  showToast(cancelAll ? 'Все повторения брони отменены.' : 'Бронь отменена.');
+
+  if (booking) {
+    const room = roomsCache.find((r) => r.id === booking.room_id);
+    const notifyLines = [
+      `❌ <b>Бронь отменена</b>`,
+      `Комната: ${room ? room.name : '—'}`,
+      `Кто отменил: ${currentUser.name} (${currentUser.department})`,
+      cancelAll
+        ? `Отменена вся серия повторяющихся броней (было на ${booking.start_time.slice(0,5)}–${booking.end_time.slice(0,5)})`
+        : `Дата: ${booking.booking_date}, время: ${booking.start_time.slice(0,5)}–${booking.end_time.slice(0,5)}`,
+    ];
+    sendTelegramNotification(notifyLines.join('\n'));
+  }
+
   closeCancelModal();
   await loadRoomsAndBookings();
 }
