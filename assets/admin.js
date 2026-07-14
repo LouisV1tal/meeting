@@ -172,13 +172,18 @@ async function saveVisibility() {
   if (!visibilityPostId) return;
   const value = visibilitySelected.size ? [...visibilitySelected] : null;
 
-  const { error } = await supabaseClient
+  const { data, error } = await supabaseClient
     .from('events')
     .update({ visible_departments: value })
-    .eq('id', visibilityPostId);
+    .eq('id', visibilityPostId)
+    .select();
 
   if (error) {
     showToast('Не удалось сохранить видимость.', true);
+    return;
+  }
+  if (!data || !data.length) {
+    showToast('Изменения не сохранились — проверьте права доступа (RLS) в Supabase.', true);
     return;
   }
 
