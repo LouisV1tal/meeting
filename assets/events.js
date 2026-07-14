@@ -5,7 +5,6 @@
 let boardUser = null;
 let selectedPhotoFile = null;
 let pendingPostId = null;
-let postsCache = [];
 
 init();
 
@@ -31,6 +30,8 @@ function setupRealtime() {
     if (pendingPostId) loadPostComments(pendingPostId);
   });
 }
+
+// ---------------- COMPOSER ----------------
 
 function bindComposer() {
   const dropZone = document.getElementById('file-drop');
@@ -109,11 +110,13 @@ async function submitPost() {
       photo_url = publicUrlData.publicUrl;
     }
 
+    // Видимость по отделам по умолчанию — видно всем. Настраивается позже из админ-панели.
     const { error: insertErr } = await supabaseClient.from('events').insert([{
       user_id: boardUser.id,
       text,
       photo_url,
       tag,
+      media_type: selectedPhotoFile ? 'image' : null,
     }]);
 
     if (insertErr) {
@@ -133,6 +136,16 @@ async function submitPost() {
   }
 }
 
+// ---------------- FEED ----------------
+
+/** Пост скрыт, если у него заданы видимые отделы (это настраивается в админке)
+ *  и текущий пользователь не из этого списка — кроме самого автора, он видит свой пост всегда. */
+function canSeePost(post) {
+  if (!post.visible_departments || !post.visible_departments.length) return true;
+  if (post.user_id === boardUser.id) return true;
+  return post.visible_departments.includes(boardUser.department);
+}
+
 async function loadPosts() {
   const grid = document.getElementById('pin-grid');
 
@@ -147,16 +160,16 @@ async function loadPosts() {
     return;
   }
 
-  postsCache = data;
+  const visiblePosts = data.filter(canSeePost);
 
-  if (!data.length) {
+  if (!visiblePosts.length) {
     grid.innerHTML = '<div class="empty">Пока пусто — стань первым, кто что-то приколет на доску 📌</div>';
     return;
   }
 
   grid.innerHTML = '';
-  data.forEach((post, i) => {
-    const tilt = (i % 5 - 2) * 0.8; // лёгкий разброс наклона карточек
+  visiblePosts.forEach((post, i) => {
+    const tilt = (i % 5 - 2) * 0.8;
     const card = document.createElement('div');
     card.className = 'pin-card';
     card.style.setProperty('--tilt', `${tilt}deg`);
@@ -165,9 +178,11 @@ async function loadPosts() {
     if (tagInfo) card.style.borderLeftColor = tagInfo.color;
 
     const isMine = boardUser && post.user_id === boardUser.id;
+    const isRestricted = post.visible_departments && post.visible_departments.length;
 
     card.innerHTML = `
       ${tagInfo ? `<span class="pin-tag" style="background:${tagInfo.color};">${escapeHtml(tagInfo.label)}</span>` : ''}
+      ${isRestricted ? `<span class="pin-visibility">👁 ${post.visible_departments.map(escapeHtml).join(', ')}</span>` : ''}
       ${post.photo_url ? `<img src="${escapeHtml(post.photo_url)}" alt="Фото к посту" loading="lazy">` : ''}
       ${post.text ? `<div class="pin-text">${escapeHtml(post.text)}</div>` : ''}
       <div class="pin-meta">

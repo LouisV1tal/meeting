@@ -13,6 +13,7 @@ function init() {
   bindRoomModal();
   bindUserModal();
   bindConfirmModal();
+  bindVisibilityModal();
 
   document.getElementById('bookings-date-filter').value = bookingsDate;
   document.getElementById('bookings-date-filter').addEventListener('change', (e) => {
@@ -75,10 +76,15 @@ async function loadEventsModeration() {
 
   data.forEach((post) => {
     const tr = document.createElement('tr');
+    const visibilityLabel = (post.visible_departments && post.visible_departments.length)
+      ? escapeHtml(post.visible_departments.join(', '))
+      : 'всем';
+
     tr.innerHTML = `
       <td>${escapeHtml(post.app_users?.name || '—')}</td>
-      <td style="max-width:280px; white-space:pre-wrap;">${escapeHtml(post.text || '—')}</td>
+      <td style="max-width:260px; white-space:pre-wrap;">${escapeHtml(post.text || '—')}</td>
       <td>${post.photo_url ? '<span class="badge">есть фото</span>' : '—'}</td>
+      <td><button class="link-btn" data-set-vis="${post.id}">${visibilityLabel}</button></td>
       <td>${new Date(post.created_at).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</td>
       <td style="text-align:right;">
         <button class="link-btn" style="color:var(--danger);" data-del-post="${post.id}">Удалить</button>
@@ -97,6 +103,88 @@ async function loadEventsModeration() {
       });
     })
   );
+
+  tbody.querySelectorAll('[data-set-vis]').forEach((btn) =>
+    btn.addEventListener('click', () => {
+      const post = data.find((p) => p.id === btn.dataset.setVis);
+      openVisibilityModal(post);
+    })
+  );
+}
+
+// ---------------- ВИДИМОСТЬ ПОСТА ПО ОТДЕЛАМ ----------------
+
+let visibilityPostId = null;
+let visibilitySelected = new Set();
+
+function bindVisibilityModal() {
+  document.getElementById('visibility-cancel').addEventListener('click', closeVisibilityModal);
+  document.getElementById('visibility-save').addEventListener('click', saveVisibility);
+  document.getElementById('visibility-overlay').addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) closeVisibilityModal();
+  });
+}
+
+async function openVisibilityModal(post) {
+  visibilityPostId = post.id;
+  visibilitySelected = new Set(post.visible_departments || []);
+
+  const { data: users, error } = await supabaseClient.from('app_users').select('department');
+  const list = document.getElementById('visibility-dept-list');
+
+  if (error || !users) {
+    list.textContent = 'Не удалось загрузить список отделов.';
+  } else {
+    const departments = [...new Set(users.map((u) => u.department).filter(Boolean))].sort();
+    if (!departments.length) {
+      list.textContent = 'Отделов пока нет.';
+    } else {
+      list.innerHTML = departments.map((dept) => `
+        <label class="dept-pill ${visibilitySelected.has(dept) ? 'checked' : ''}" data-dept="${escapeHtml(dept)}">
+          <input type="checkbox" value="${escapeHtml(dept)}" ${visibilitySelected.has(dept) ? 'checked' : ''}>
+          ${escapeHtml(dept)}
+        </label>
+      `).join('');
+
+      list.querySelectorAll('.dept-pill').forEach((pill) => {
+        const checkbox = pill.querySelector('input');
+        pill.addEventListener('click', (e) => {
+          if (e.target.tagName !== 'INPUT') checkbox.checked = !checkbox.checked;
+          const dept = pill.dataset.dept;
+          if (checkbox.checked) visibilitySelected.add(dept);
+          else visibilitySelected.delete(dept);
+          pill.classList.toggle('checked', checkbox.checked);
+        });
+      });
+    }
+  }
+
+  document.getElementById('visibility-overlay').hidden = false;
+}
+
+function closeVisibilityModal() {
+  document.getElementById('visibility-overlay').hidden = true;
+  visibilityPostId = null;
+  visibilitySelected = new Set();
+}
+
+async function saveVisibility() {
+  if (!visibilityPostId) return;
+  const value = visibilitySelected.size ? [...visibilitySelected] : null;
+
+  const { error } = await supabaseClient
+    .from('events')
+    .update({ visible_departments: value })
+    .eq('id', visibilityPostId);
+
+  if (error) {
+    showToast('Не удалось сохранить видимость.', true);
+    return;
+  }
+
+  showToast('Видимость поста обновлена.');
+  closeVisibilityModal();
+  loadEventsModeration();
 }
 
 // ---------------- ROOMS ----------------
@@ -358,6 +446,7 @@ function bindConfirmModal() {
       closeRoomModal();
       closeUserModal();
       closeConfirm();
+      closeVisibilityModal();
     }
   });
 }
