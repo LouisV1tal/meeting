@@ -183,6 +183,11 @@
         <label for="user-dept">Отдел</label>
         <select id="user-dept" required></select>
       </div>
+      <div class="field">
+        <label for="user-pin">Новый PIN-код (необязательно)</label>
+        <input type="password" id="user-pin" inputmode="numeric" maxlength="6" placeholder="Оставь пустым, чтобы не менять">
+        <div class="hint">4–6 цифр. Заполни, только если нужно сбросить забытый PIN пользователю.</div>
+      </div>
       <div class="error-text" id="user-error"></div>
       <div class="modal-actions">
         <button type="button" class="btn btn-ghost" id="user-cancel">Отмена</button>
