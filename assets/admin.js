@@ -437,9 +437,18 @@ async function loadUsers() {
         'Удалить пользователя?',
         `«${user.name}» будет удалён вместе со всеми его бронями, комментариями и постами на доске событий. Это необратимо.`,
         async () => {
-          const { error: delErr } = await supabaseClient.from('app_users').delete().eq('id', user.id);
-          if (delErr) showToast('Не удалось удалить пользователя.', true);
-          else showToast('Пользователь удалён.');
+          const { data: delData, error: delErr } = await supabaseClient
+            .from('app_users')
+            .delete()
+            .eq('id', user.id)
+            .select();
+          if (delErr) {
+            showToast('Не удалось удалить пользователя.', true);
+          } else if (!delData || !delData.length) {
+            showToast('Удаление не сработало — проверьте права доступа (RLS) в Supabase.', true);
+          } else {
+            showToast('Пользователь удалён.');
+          }
           loadUsers();
           loadBookings();
           loadEventsModeration();
