@@ -417,8 +417,10 @@ async function loadUsers() {
       <td>${escapeHtml(u.name)}</td>
       <td>${escapeHtml(u.department)}</td>
       <td>${new Date(u.created_at).toLocaleDateString('ru-RU')}</td>
-      <td style="text-align:right;">
+      <td style="text-align:right; white-space:nowrap;">
         <button class="link-btn" data-edit-user="${u.id}">Изменить</button>
+        &nbsp;·&nbsp;
+        <button class="link-btn" style="color:var(--danger);" data-del-user="${u.id}">Удалить</button>
       </td>
     `;
     tbody.appendChild(tr);
@@ -426,6 +428,24 @@ async function loadUsers() {
 
   tbody.querySelectorAll('[data-edit-user]').forEach((btn) =>
     btn.addEventListener('click', () => openUserModal(data.find((u) => u.id === btn.dataset.editUser)))
+  );
+
+  tbody.querySelectorAll('[data-del-user]').forEach((btn) =>
+    btn.addEventListener('click', () => {
+      const user = data.find((u) => u.id === btn.dataset.delUser);
+      openConfirm(
+        'Удалить пользователя?',
+        `«${user.name}» будет удалён вместе со всеми его бронями, комментариями и постами на доске событий. Это необратимо.`,
+        async () => {
+          const { error: delErr } = await supabaseClient.from('app_users').delete().eq('id', user.id);
+          if (delErr) showToast('Не удалось удалить пользователя.', true);
+          else showToast('Пользователь удалён.');
+          loadUsers();
+          loadBookings();
+          loadEventsModeration();
+        }
+      );
+    })
   );
 }
 
