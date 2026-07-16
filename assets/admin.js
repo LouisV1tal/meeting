@@ -11,6 +11,7 @@ init();
 function init() {
   bindLogin();
   bindRoomModal();
+  bindDeptModal();
   bindUserModal();
   bindConfirmModal();
   bindVisibilityModal();
@@ -50,10 +51,109 @@ function bindLogin() {
 function showAdminApp() {
   document.getElementById('admin-auth').hidden = true;
   document.getElementById('admin-app').hidden = false;
+  loadDepartments();
   loadRooms();
   loadUsers();
   loadBookings();
   loadEventsModeration();
+}
+
+// ---------------- ОТДЕЛЫ ----------------
+
+let departmentsCache = [];
+
+async function loadDepartments() {
+  const { data, error } = await supabaseClient.from('departments').select('*').order('name');
+  const tbody = document.getElementById('depts-tbody');
+  const empty = document.getElementById('depts-empty');
+  tbody.innerHTML = '';
+
+  if (error) {
+    showToast('Не удалось загрузить отделы. Выполнена ли supabase-migration-6.sql?', true);
+    return;
+  }
+
+  departmentsCache = data;
+  empty.hidden = data.length > 0;
+
+  data.forEach((dept) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${escapeHtml(dept.name)}</td>
+      <td style="text-align:right; white-space:nowrap;">
+        <button class="link-btn" data-edit-dept="${dept.id}">Переименовать</button>
+        &nbsp;·&nbsp;
+        <button class="link-btn" style="color:var(--danger);" data-del-dept="${dept.id}">Удалить</button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  tbody.querySelectorAll('[data-edit-dept]').forEach((btn) =>
+    btn.addEventListener('click', () => openDeptModal(data.find((d) => d.id === btn.dataset.editDept)))
+  );
+  tbody.querySelectorAll('[data-del-dept]').forEach((btn) =>
+    btn.addEventListener('click', () => {
+      const dept = data.find((d) => d.id === btn.dataset.delDept);
+      openConfirm(
+        'Удалить отдел?',
+        `«${dept.name}» исчезнет из списка выбора. У пользователей, которые уже в этом отделе, название останется как есть — при желании переназначь их вручную.`,
+        async () => {
+          const { error: delErr } = await supabaseClient.from('departments').delete().eq('id', dept.id);
+          if (delErr) showToast('Не удалось удалить отдел.', true);
+          else showToast('Отдел удалён.');
+          loadDepartments();
+        }
+      );
+    })
+  );
+}
+
+function bindDeptModal() {
+  document.getElementById('add-dept-btn').addEventListener('click', () => openDeptModal(null));
+  document.getElementById('dept-cancel').addEventListener('click', closeDeptModal);
+  document.getElementById('dept-form').addEventListener('submit', saveDept);
+  document.getElementById('dept-overlay').addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) closeDeptModal();
+  });
+}
+
+function openDeptModal(dept) {
+  document.getElementById('dept-modal-title').textContent = dept ? 'Переименовать отдел' : 'Новый отдел';
+  document.getElementById('dept-id').value = dept?.id || '';
+  document.getElementById('dept-name').value = dept?.name || '';
+  document.getElementById('dept-error').textContent = '';
+  document.getElementById('dept-overlay').hidden = false;
+}
+
+function closeDeptModal() {
+  document.getElementById('dept-overlay').hidden = true;
+}
+
+async function saveDept(e) {
+  e.preventDefault();
+  const id = document.getElementById('dept-id').value;
+  const name = document.getElementById('dept-name').value.trim();
+  const errEl = document.getElementById('dept-error');
+
+  if (!name) {
+    errEl.textContent = 'Укажите название отдела.';
+    return;
+  }
+
+  const query = id
+    ? supabaseClient.from('departments').update({ name }).eq('id', id)
+    : supabaseClient.from('departments').insert([{ name }]);
+
+  const { error } = await query;
+  if (error) {
+    errEl.textContent = error.code === '23505' ? 'Такой отдел уже есть.' : 'Не удалось сохранить.';
+    return;
+  }
+
+  closeDeptModal();
+  showToast('Отдел сохранён.');
+  loadDepartments();
 }
 
 // ---------------- EVENTS BOARD MODERATION ----------------
@@ -129,34 +229,29 @@ async function openVisibilityModal(post) {
   visibilityPostId = post.id;
   visibilitySelected = new Set(post.visible_departments || []);
 
-  const { data: users, error } = await supabaseClient.from('app_users').select('department');
   const list = document.getElementById('visibility-dept-list');
 
-  if (error || !users) {
-    list.textContent = 'Не удалось загрузить список отделов.';
+  if (!departmentsCache.length) {
+    list.textContent = 'Отделов пока нет — добавь их в разделе «Отделы» выше.';
   } else {
-    const departments = [...new Set(users.map((u) => u.department).filter(Boolean))].sort();
-    if (!departments.length) {
-      list.textContent = 'Отделов пока нет.';
-    } else {
-      list.innerHTML = departments.map((dept) => `
-        <label class="dept-pill ${visibilitySelected.has(dept) ? 'checked' : ''}" data-dept="${escapeHtml(dept)}">
-          <input type="checkbox" value="${escapeHtml(dept)}" ${visibilitySelected.has(dept) ? 'checked' : ''}>
-          ${escapeHtml(dept)}
-        </label>
-      `).join('');
+    const departments = departmentsCache.map((d) => d.name);
+    list.innerHTML = departments.map((dept) => `
+      <label class="dept-pill ${visibilitySelected.has(dept) ? 'checked' : ''}" data-dept="${escapeHtml(dept)}">
+        <input type="checkbox" value="${escapeHtml(dept)}" ${visibilitySelected.has(dept) ? 'checked' : ''}>
+        ${escapeHtml(dept)}
+      </label>
+    `).join('');
 
-      list.querySelectorAll('.dept-pill').forEach((pill) => {
-        const checkbox = pill.querySelector('input');
-        pill.addEventListener('click', (e) => {
-          if (e.target.tagName !== 'INPUT') checkbox.checked = !checkbox.checked;
-          const dept = pill.dataset.dept;
-          if (checkbox.checked) visibilitySelected.add(dept);
-          else visibilitySelected.delete(dept);
-          pill.classList.toggle('checked', checkbox.checked);
-        });
+    list.querySelectorAll('.dept-pill').forEach((pill) => {
+      const checkbox = pill.querySelector('input');
+      pill.addEventListener('click', (e) => {
+        if (e.target.tagName !== 'INPUT') checkbox.checked = !checkbox.checked;
+        const dept = pill.dataset.dept;
+        if (checkbox.checked) visibilitySelected.add(dept);
+        else visibilitySelected.delete(dept);
+        pill.classList.toggle('checked', checkbox.checked);
       });
-    }
+    });
   }
 
   document.getElementById('visibility-overlay').hidden = false;
@@ -345,7 +440,17 @@ function bindUserModal() {
 function openUserModal(user) {
   document.getElementById('user-id').value = user.id;
   document.getElementById('user-name').value = user.name;
-  document.getElementById('user-dept').value = user.department;
+
+  const select = document.getElementById('user-dept');
+  const options = departmentsCache.map((d) => d.name);
+  const hasCurrent = options.includes(user.department);
+
+  select.innerHTML = [
+    ...(hasCurrent || !user.department ? [] : [`<option value="${escapeHtml(user.department)}">${escapeHtml(user.department)} (не из списка — переименуй ниже)</option>`]),
+    ...options.map((name) => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`),
+  ].join('');
+  select.value = user.department;
+
   document.getElementById('user-error').textContent = '';
   document.getElementById('user-overlay').hidden = false;
 }
@@ -358,7 +463,7 @@ async function saveUser(e) {
   e.preventDefault();
   const id = document.getElementById('user-id').value;
   const name = document.getElementById('user-name').value.trim();
-  const department = document.getElementById('user-dept').value.trim();
+  const department = document.getElementById('user-dept').value;
   const errEl = document.getElementById('user-error');
 
   if (!name || !department) {
@@ -449,6 +554,7 @@ function bindConfirmModal() {
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
       closeRoomModal();
+      closeDeptModal();
       closeUserModal();
       closeConfirm();
       closeVisibilityModal();

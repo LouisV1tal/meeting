@@ -17,6 +17,7 @@ init();
 async function init() {
   currentUser = getSession();
   await populateLoginNames();
+  await populateRegDepartments();
 
   if (currentUser) {
     showApp();
@@ -75,6 +76,29 @@ async function populateLoginNames() {
     const opt = document.createElement('option');
     opt.value = u.id;
     opt.textContent = u.name;
+    select.appendChild(opt);
+  });
+}
+
+async function populateRegDepartments() {
+  const { data, error } = await supabaseClient
+    .from('departments')
+    .select('id, name')
+    .order('name', { ascending: true });
+
+  const select = document.getElementById('reg-dept');
+  if (error || !data) {
+    console.error(error);
+    return;
+  }
+  if (!data.length) {
+    select.innerHTML = '<option value="" disabled selected>Отделы ещё не добавлены — обратитесь к админу</option>';
+    return;
+  }
+  data.forEach((d) => {
+    const opt = document.createElement('option');
+    opt.value = d.name;
+    opt.textContent = d.name;
     select.appendChild(opt);
   });
 }
