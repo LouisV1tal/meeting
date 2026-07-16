@@ -480,6 +480,7 @@ function openUserModal(user) {
   ].join('');
   select.value = user.department;
 
+  document.getElementById('user-pin').value = '';
   document.getElementById('user-error').textContent = '';
   document.getElementById('user-overlay').hidden = false;
 }
@@ -493,6 +494,7 @@ async function saveUser(e) {
   const id = document.getElementById('user-id').value;
   const name = document.getElementById('user-name').value.trim();
   const department = document.getElementById('user-dept').value;
+  const newPin = document.getElementById('user-pin').value.trim();
   const errEl = document.getElementById('user-error');
 
   if (!name || !department) {
@@ -500,14 +502,24 @@ async function saveUser(e) {
     return;
   }
 
-  const { error } = await supabaseClient.from('app_users').update({ name, department }).eq('id', id);
+  if (newPin && !/^\d{4,6}$/.test(newPin)) {
+    errEl.textContent = 'PIN должен состоять из 4–6 цифр.';
+    return;
+  }
+
+  const payload = { name, department };
+  if (newPin) {
+    payload.pin_hash = await sha256(newPin);
+  }
+
+  const { error } = await supabaseClient.from('app_users').update(payload).eq('id', id);
   if (error) {
     errEl.textContent = error.code === '23505' ? 'Такое имя уже занято.' : 'Не удалось сохранить.';
     return;
   }
 
   closeUserModal();
-  showToast('Пользователь обновлён.');
+  showToast(newPin ? 'Пользователь обновлён, PIN сброшен.' : 'Пользователь обновлён.');
   loadUsers();
 }
 
